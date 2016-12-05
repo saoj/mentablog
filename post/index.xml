@@ -17,13 +17,13 @@
       <guid>https://saoj.github.io/mentablog/post/hello-hugo/</guid>
       <description>&lt;p&gt;This is my first blog post with Hugo. Looking forward to moving away from Wordpress.&lt;/p&gt;
 
-&lt;p&gt;Let&amp;rsquo;s see if it can show some source code:
-&amp;ldquo;&amp;lsquo;Java
-User user = PropertiesProxy.create(User.class);
-beanManager.bean(User.class, &amp;ldquo;users&amp;rdquo;) // table name is &amp;ldquo;users&amp;rdquo;
-  .pk(user.getId(), &amp;ldquo;user_id&amp;rdquo;, DBTypes.AUTOINCREMENT) // &amp;ldquo;id&amp;rdquo; property maps to &amp;ldquo;user_id&amp;rdquo; column
-  .field(user.getName(), &amp;ldquo;username&amp;rdquo;, DBTypes.STRING); // &amp;ldquo;name&amp;rdquo; property maps to &amp;ldquo;username&amp;rdquo; column
-&amp;ldquo;&amp;rsquo;&lt;/p&gt;
+&lt;p&gt;Let&amp;rsquo;s see if it can show some source code:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;User user = PropertiesProxy.create(User.class);
+beanManager.bean(User.class, &amp;quot;users&amp;quot;) // table name is &amp;quot;users&amp;quot;
+  .pk(user.getId(), &amp;quot;user_id&amp;quot;, DBTypes.AUTOINCREMENT) // &amp;quot;id&amp;quot; property maps to &amp;quot;user_id&amp;quot; column
+  .field(user.getName(), &amp;quot;username&amp;quot;, DBTypes.STRING); // &amp;quot;name&amp;quot; property maps to &amp;quot;username&amp;quot; column
+&lt;/code&gt;&lt;/pre&gt;
 </description>
     </item>
     

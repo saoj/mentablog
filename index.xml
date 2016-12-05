@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Menta Blog</title>
+    <link>https://saoj.github.io/mentablog/index.xml</link>
+    <description>Recent content on Menta Blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 05 Dec 2016 13:54:43 -0600</lastBuildDate>
+    <atom:link href="https://saoj.github.io/mentablog/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Hello Hugo</title>
+      <link>https://saoj.github.io/mentablog/post/hello-hugo/</link>
+      <pubDate>Mon, 05 Dec 2016 13:54:43 -0600</pubDate>
+      
+      <guid>https://saoj.github.io/mentablog/post/hello-hugo/</guid>
+      <description>&lt;p&gt;This is my first blog post with Hugo. Looking forward to moving away from Wordpress.&lt;/p&gt;
+
+&lt;p&gt;Let&amp;rsquo;s see if it can show some source code:
+&amp;ldquo;&amp;lsquo;Java
+User user = PropertiesProxy.create(User.class);
+beanManager.bean(User.class, &amp;ldquo;users&amp;rdquo;) // table name is &amp;ldquo;users&amp;rdquo;
+  .pk(user.getId(), &amp;ldquo;user_id&amp;rdquo;, DBTypes.AUTOINCREMENT) // &amp;ldquo;id&amp;rdquo; property maps to &amp;ldquo;user_id&amp;rdquo; column
+  .field(user.getName(), &amp;ldquo;username&amp;rdquo;, DBTypes.STRING); // &amp;ldquo;name&amp;rdquo; property maps to &amp;ldquo;username&amp;rdquo; column
+&amp;ldquo;&amp;rsquo;&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

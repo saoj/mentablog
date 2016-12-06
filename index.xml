@@ -2,20 +2,20 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Menta Blog</title>
-    <link>https://blog.soliveirajr.com/index.xml</link>
+    <link>http://blog.soliveirajr.com/index.xml</link>
     <description>Recent content on Menta Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>Sergio Oliveira Jr.</copyright>
     <lastBuildDate>Mon, 05 Dec 2016 13:54:43 -0600</lastBuildDate>
-    <atom:link href="https://blog.soliveirajr.com/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://blog.soliveirajr.com/index.xml" rel="self" type="application/rss+xml" />
     
     <item>
       <title>Hello Hugo</title>
-      <link>https://blog.soliveirajr.com/hello-hugo/</link>
+      <link>http://blog.soliveirajr.com/hello-hugo/</link>
       <pubDate>Mon, 05 Dec 2016 13:54:43 -0600</pubDate>
       
-      <guid>https://blog.soliveirajr.com/hello-hugo/</guid>
+      <guid>http://blog.soliveirajr.com/hello-hugo/</guid>
       <description>&lt;p&gt;This is my first blog post with Hugo. Looking forward to moving away from Wordpress.&lt;/p&gt;
 
 &lt;p&gt;Let&amp;rsquo;s see if it can show some source code:&lt;/p&gt;

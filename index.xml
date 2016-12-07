@@ -28,5 +28,115 @@ beanManager.bean(User.class, &amp;quot;users&amp;quot;) // table name is &amp;qu
 </description>
     </item>
     
+    <item>
+      <title>Hibernate is more complex than the problem it tries to solve</title>
+      <link>http://blog.soliveirajr.com/hibernate-is-more-complex-than-the-problem-it-tries-to-solve/</link>
+      <pubDate>Tue, 13 Nov 2012 15:49:48 -0600</pubDate>
+      
+      <guid>http://blog.soliveirajr.com/hibernate-is-more-complex-than-the-problem-it-tries-to-solve/</guid>
+      <description>
+
+&lt;p&gt;Relational databases have been around for a long time and there is nothing too complex about them. Any medium programmer should be able to learn how to write SQL in less than a day. Indexes, joins, transactions, caching, lazy loading are not complex topics either. Despite all that, Hibernate has become the de facto standard for writing database access code in Java. In this article I try to explain the drawbacks of Hibernate and how things can be done differently.&lt;/p&gt;
+
+&lt;p&gt;When I first met Hibernate, these were the questions that my brain could not stop asking me:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Why do I have to learn a new query language when there is SQL?&lt;/li&gt;
+&lt;li&gt;Why the Hibernate learning curve is so big?&lt;/li&gt;
+&lt;li&gt;Why does Hibernate do so many things &lt;em&gt;automagically&lt;/em&gt; that I cannot control or understand?&lt;/li&gt;
+&lt;li&gt;Why is so hard to make sense of the Hibernate mappings through annotations?&lt;/li&gt;
+&lt;li&gt;Why a programmatic approach through a fluent API or DSL is not offered?&lt;/li&gt;
+&lt;li&gt;Do I really care about database independency?&lt;/li&gt;
+&lt;li&gt;Do people really think that without Hibernate you have to write a lot of SQL and JDBC boilerplate?&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Below I will try to answer these questions:&lt;/p&gt;
+
+&lt;h4 id=&#34;why-do-i-have-to-learn-a-new-query-language-when-there-is-sql&#34;&gt;Why do I have to learn a new query language when there is SQL?&lt;/h4&gt;
+
+&lt;p&gt;If you never heard about SQL you can probably learn HQL or Criteria, the query languages of Hibernate, without a problem. But if you know SQL there is little motivation for you to learn those new query languages. The gain is small plus everything you write will be eventually converted to SQL anyways. I can see some people saying that HQL is more objected-oriented and Criteria is entirely done with objects, but that alone does not justify using Hibernate and its complexity in your projects. At the end, you will be better off by speaking directly to the database using its native SQL language so you can understand and take control of your code. Below are some examples of people struggling with HQL when they already know SQL:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://stackoverflow.com/questions/8678865/sql-to-hql-conversion&#34;&gt;http://stackoverflow.com/questions/8678865/sql-to-hql-conversion&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://stackoverflow.com/questions/12098814/hql-left-join-cracks-even-with-easy-examples&#34;&gt;http://stackoverflow.com/questions/12098814/hql-left-join-cracks-even-with-easy-examples&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://stackoverflow.com/questions/267085/converting-sql-to-hql&#34;&gt;http://stackoverflow.com/questions/267085/converting-sql-to-hql&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;And you can &lt;a href=&#34;https://www.google.com/?q=translating+sql+hql+site:stackoverflow.com#hl=en&amp;amp;q=translating+sql+hql+site:stackoverflow.com&#34;&gt;click here&lt;/a&gt; for the google full list&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&#34;why-the-hibernate-learning-curve-is-so-big-why-does-hibernate-do-so-many-things-automagically-that-i-cannot-control-or-understand&#34;&gt;Why the Hibernate learning curve is so big? Why does Hibernate do so many things automagically that I cannot control or understand?&lt;/h4&gt;
+
+&lt;p&gt;When I check the Java questions in a forum or discussion list I can’t help but notice that a lot of them are about Hibernate. Hibernate can have some qualities but &lt;em&gt;&amp;ldquo;persistency that just works&amp;rdquo;&lt;/em&gt; is not one of them. It often does not work or works in ways you could have never imagined. I must agree with what &lt;a href=&#34;http://stackoverflow.com/users/70604/pascal-thivent&#34;&gt;Pascal Thivent&lt;/a&gt; says &lt;a href=&#34;http://stackoverflow.com/questions/1607819/weaknesses-of-hibernate&#34;&gt;here&lt;/a&gt;: &lt;em&gt;&amp;ldquo;Hibernate in the wrong hands can be a real disaster!&amp;rdquo;&lt;/em&gt;. Below I list another examples of Hibernate surprising behaviors:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://stackoverflow.com/questions/179259/why-does-hibernate-try-to-delete-when-i-try-to-update-insert&#34;&gt;http://stackoverflow.com/questions/179259/why-does-hibernate-try-to-delete-when-i-try-to-update-insert&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://stackoverflow.com/questions/3316070/hibernate-why-does-a-change-of-bag-lead-to-strange-adds-and-deletes-in-the-data&#34;&gt;http://stackoverflow.com/questions/3316070/hibernate-why-does-a-change-of-bag-lead-to-strange-adds-and-deletes-in-the-data&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://stackoverflow.com/questions/11081133/hibernate-why-insert-operation-is-performed-last-in-this-case&#34;&gt;http://stackoverflow.com/questions/11081133/hibernate-why-insert-operation-is-performed-last-in-this-case&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&#34;why-is-so-hard-to-make-sense-of-the-hibernate-mappings-through-annotations-why-a-programmatic-approach-through-a-fluent-api-or-dsl-is-not-offered&#34;&gt;Why is so hard to make sense of the Hibernate mappings through annotations? Why a programmatic approach through a fluent API or DSL is not offered?&lt;/h4&gt;
+
+&lt;p&gt;If somehow the relationship between your entities are not working as expected then all you have to do is play with those annotations and hope that it will work the same way you would hope for a better image by hitting the top of your TV in the old days. Annotations is just a little less bad than XML, but not much. Its complexity can easily get out of control in what is known as &lt;em&gt;Annotatiomania&lt;/em&gt;, a term coined by Lukas Eder in his blog series below:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;http://blog.jooq.org/2011/09/07/why-did-hibernatejpa-get-so-complex/&#34;&gt;http://blog.jooq.org/2011/09/07/why-did-hibernatejpa-get-so-complex/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://blog.jooq.org/2011/10/25/annotatiomania-next-level-jpa-and-jaxb-combined/&#34;&gt;http://blog.jooq.org/2011/10/25/annotatiomania-next-level-jpa-and-jaxb-combined/&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;http://blog.jooq.org/2011/11/24/next-stop-on-the-annotatiomania-train-fetchgroups/&#34;&gt;http://blog.jooq.org/2011/11/24/next-stop-on-the-annotatiomania-train-fetchgroups/&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&#34;do-i-really-care-about-database-independency&#34;&gt;Do I really care about database independency?&lt;/h4&gt;
+
+&lt;p&gt;Your database is something you choose in the very beginning of your project and then stick to it to the very end. There is no point of being paranoid about database independence, not even for automated tests executed against a different database engine. Plus some good in-memory databases like H2 has &lt;a href=&#34;http://www.h2database.com/html/features.html#compatibility&#34;&gt;compatibility with other databases&lt;/a&gt; so you can run your queries without a problem. Even if you run into a compatibility problem that just tells you that you should not be running your automated tests against a different database.&lt;/p&gt;
+
+&lt;h4 id=&#34;do-people-really-think-that-without-hibernate-you-have-to-write-a-lot-of-sql-and-jdbc-boilerplate&#34;&gt;Do people really think that without Hibernate you have to write a lot of SQL and JDBC boilerplate?&lt;/h4&gt;
+
+&lt;p&gt;People who think like that were probably so busy learning Hibernate that they missed the alternative movement of query builders or worse, don’t understand the wonders that reflection, proxies and abstraction can do to simplify things. Check the code below which performs a SQL query:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;Connection conn = getConnection();
+BeanSession session = getBeanSession(conn);
+PreparedStatement stmt = null;
+ResultSet rset = null;
+
+try {
+
+    TableAlias&amp;lt;User&amp;gt; userAlias = beanSession.createTableAlias(User.class);
+    User user = userAlias.proxy();
+
+    SQLBuilder sql = new SQLBuilder(userAlias);
+    sql.append(&amp;quot;select &amp;quot;);
+    sql.append(userAlias.columns());
+    sql.append(&amp;quot; from &amp;quot;).append(userAlias.tableName());
+    sql.append(&amp;quot; where &amp;quot;).column(user.getName()).append(&amp;quot; like ?&amp;quot;);
+    sql.append(&amp;quot; and &amp;quot;).column(user.getId()).append(&amp;quot; &amp;gt; ?&amp;quot;);
+    sql.append(&amp;quot; order by &amp;quot;).column(user.getName()).append(&amp;quot; desc&amp;quot;);
+
+    stmt = SQLUtils.prepare(conn, sql.toString(), &amp;quot;M%&amp;quot;, 11); // varargs for params
+
+    rset = stmt.executeQuery();
+
+    List&amp;lt;User&amp;gt; users = new LinkedList&amp;lt;User&amp;gt;();
+
+    while(rset.next()) {
+        User u = new User();
+        beanSession.populateBean(rset, u);
+        users.add(u);
+    }
+ 
+    System.out.println(&amp;quot;Total number of users loaded: &amp;quot; + users.size());
+ 
+} finally {
+    SQLUtils.close(rset, stmt, conn);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;so-what-is-the-alternative&#34;&gt;So what is the alternative?&lt;/h3&gt;
+
+&lt;p&gt;It is any non-intrusive framework that gives you control without complexity through abstraction. I am going to suggest &lt;a href=&#34;https://github.com/saoj/mentabean&#34;&gt;MentaBean&lt;/a&gt;, of which I am the creator, but there are also others like &lt;a href=&#34;http://www.jooq.org/&#34;&gt;jOOQ&lt;/a&gt;, &lt;a href=&#34;http://blog.mybatis.org/&#34;&gt;myBatis&lt;/a&gt;, &lt;a href=&#34;https://code.google.com/archive/p/ollin/&#34;&gt;Ollin&lt;/a&gt;, etc. MentaBean is a straightforward ORM (Object-Relational Mapping) framework for those who want to work with SQL without the JDBC boilerplate. Differently than other ORMs it keeps the magic to a minimum so you always know what is going on under the hood. MentaBean automates CRUD operations without any SQL, but it will not make you learn a new language when you need to query. Instead it helps you build your queries using SQL without the boring parts. It also does the object-to-database mappings programmatically through a fluent API. With MentaBean you don’t have to worry about XML programming or Annotation hell because the mappings are done with Java code. So if you like and understand SQL and are tired of the huge learning curve and unpredictable behavior offered by other complex ORM frameworks you should try MentaBean for a simplicity break.&lt;/p&gt;
+
+&lt;h3 id=&#34;conclusion&#34;&gt;Conclusion&lt;/h3&gt;
+
+&lt;p&gt;I expect that some people will say that I just don’t get the benefits of Hibernate and that I don’t know how to use it. Although there might be some truth in that statement, as a matter of principles no benefit is justified with the drawback of complexity. A solid foundation focused on simplicity is what guarantees the success of a software system in the long-run. Hibernate is so big, powerful and complex that it can easily get out of control. If the focus is simplicity and control, other better alternatives like MentaBean should be considered.&lt;/p&gt;
+</description>
+    </item>
+    
   </channel>
 </rss>

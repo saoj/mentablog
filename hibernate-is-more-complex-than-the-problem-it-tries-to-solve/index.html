@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title>Hibernate is more complex than the problem it tries to solve &middot; Sergio Oliveira Jr.</title>
+        <meta name="description" content="Relational databases have been around for a long time and there is nothing too complex about them. Any medium programmer should be able to learn how to write SQL in less than a day. Indexes, joins, transactions, caching, lazy loading are not complex topics either. Despite all that, Hibernate has become the de facto standard for writing database access code in Java. In this article I try to explain the drawbacks of Hibernate and how things can be done differently.">
+        <meta name="HandheldFriendly" content="True">
+        <meta name="MobileOptimized" content="320">
+        <meta name="generator" content="Hugo 0.17" />
+        <meta name="robots" content="index,follow">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta property="og:title" content="Hibernate is more complex than the problem it tries to solve">
+<meta property="og:description" content="Relational databases have been around for a long time and there is nothing too complex about them. Any medium programmer should be able to learn how to write SQL in less than a day. Indexes, joins, transactions, caching, lazy loading are not complex topics either. Despite all that, Hibernate has become the de facto standard for writing database access code in Java. In this article I try to explain the drawbacks of Hibernate and how things can be done differently.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="http://blog.soliveirajr.com/hibernate-is-more-complex-than-the-problem-it-tries-to-solve/">
+        <link rel="stylesheet" href="http://blog.soliveirajr.com/css/normalize.css">
+        <link rel="stylesheet" href="http://blog.soliveirajr.com/css/highlight.css">
+        <link rel="stylesheet" href="http://blog.soliveirajr.com/css/style.css">
+        <link rel="stylesheet" href="http://blog.soliveirajr.com/css/prism.css">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,400,600,700,300&subset=latin,cyrillic-ext,latin-ext,cyrillic">
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css">
+    </head>
+    <body>
+        
+
+        <div id="wrapper">
+            <header class="site-header">
+                <div class="container">
+                    <div class="site-title-wrapper">
+                        
+                            <h1 class="site-title">
+                                <a title="Menta Blog" href="http://blog.soliveirajr.com/">Menta Blog</a>
+                            </h1>
+                        
+                        <a target="_blank" class="button-square" href="http://blog.soliveirajr.com/index.xml"><i class="fa fa-rss"></i></a>
+                        
+                        
+                        
+                            <a target="_blank" class="button-square button-social hint--top" data-hint="Github" title="Github" href="https://github.com/saoj">
+                                <i class="fa fa-github-alt"></i>
+                            </a>
+                        
+                        
+                        
+                            <a target="_blank" class="button-square button-social hint--top" data-hint="LinkedIn" title="LinkedIn" href="https://linkedin.com/in/soliveira/">
+                                <i class="fa fa-linkedin"></i>
+                            </a>
+                        
+                        
+			
+			<a target="_blank" class="button-square" href="mailto:sergio.oliveira.jr@gmail.com"><b>@</b></a>
+			 
+                    </div>
+
+                    <ul class="site-nav">
+                        
+                    </ul>
+                </div>
+            </header>
+
+            <div id="container">
+
+
+<div class="container">
+    <article class="post-container" itemscope="" itemtype="http://schema.org/BlogPosting">
+        <header class="post-header">
+    <h1 class="post-title" itemprop="name headline">Hibernate is more complex than the problem it tries to solve</h1>
+    
+    <p class="post-date">
+        <span>Published <time datetime="2012-11-13" itemprop="datePublished">Nov 13, 2012</time></span>
+        <span>by</span>
+        <span itemscope="" itemprop="author" itemtype="https://schema.org/Person">
+            <span itemprop="name">
+                <a href="https://linkedin.com/in/soliveira/" itemprop="url" rel="author" target="_blank">Sergio Oliveira Jr.</a>
+            </span>
+        </span>
+    </p>
+</header>
+
+
+        <div class="post-content clearfix" itemprop="articleBody">
+    
+
+    
+
+<p>Relational databases have been around for a long time and there is nothing too complex about them. Any medium programmer should be able to learn how to write SQL in less than a day. Indexes, joins, transactions, caching, lazy loading are not complex topics either. Despite all that, Hibernate has become the de facto standard for writing database access code in Java. In this article I try to explain the drawbacks of Hibernate and how things can be done differently.</p>
+
+<p>When I first met Hibernate, these were the questions that my brain could not stop asking me:</p>
+
+<ul>
+<li>Why do I have to learn a new query language when there is SQL?</li>
+<li>Why the Hibernate learning curve is so big?</li>
+<li>Why does Hibernate do so many things <em>automagically</em> that I cannot control or understand?</li>
+<li>Why is so hard to make sense of the Hibernate mappings through annotations?</li>
+<li>Why a programmatic approach through a fluent API or DSL is not offered?</li>
+<li>Do I really care about database independency?</li>
+<li>Do people really think that without Hibernate you have to write a lot of SQL and JDBC boilerplate?</li>
+</ul>
+
+<p>Below I will try to answer these questions:</p>
+
+<h4 id="why-do-i-have-to-learn-a-new-query-language-when-there-is-sql">Why do I have to learn a new query language when there is SQL?</h4>
+
+<p>If you never heard about SQL you can probably learn HQL or Criteria, the query languages of Hibernate, without a problem. But if you know SQL there is little motivation for you to learn those new query languages. The gain is small plus everything you write will be eventually converted to SQL anyways. I can see some people saying that HQL is more objected-oriented and Criteria is entirely done with objects, but that alone does not justify using Hibernate and its complexity in your projects. At the end, you will be better off by speaking directly to the database using its native SQL language so you can understand and take control of your code. Below are some examples of people struggling with HQL when they already know SQL:</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/8678865/sql-to-hql-conversion">http://stackoverflow.com/questions/8678865/sql-to-hql-conversion</a></li>
+<li><a href="http://stackoverflow.com/questions/12098814/hql-left-join-cracks-even-with-easy-examples">http://stackoverflow.com/questions/12098814/hql-left-join-cracks-even-with-easy-examples</a></li>
+<li><a href="http://stackoverflow.com/questions/267085/converting-sql-to-hql">http://stackoverflow.com/questions/267085/converting-sql-to-hql</a></li>
+<li>And you can <a href="https://www.google.com/?q=translating+sql+hql+site:stackoverflow.com#hl=en&amp;q=translating+sql+hql+site:stackoverflow.com">click here</a> for the google full list</li>
+</ul>
+
+<h4 id="why-the-hibernate-learning-curve-is-so-big-why-does-hibernate-do-so-many-things-automagically-that-i-cannot-control-or-understand">Why the Hibernate learning curve is so big? Why does Hibernate do so many things automagically that I cannot control or understand?</h4>
+
+<p>When I check the Java questions in a forum or discussion list I can’t help but notice that a lot of them are about Hibernate. Hibernate can have some qualities but <em>&ldquo;persistency that just works&rdquo;</em> is not one of them. It often does not work or works in ways you could have never imagined. I must agree with what <a href="http://stackoverflow.com/users/70604/pascal-thivent">Pascal Thivent</a> says <a href="http://stackoverflow.com/questions/1607819/weaknesses-of-hibernate">here</a>: <em>&ldquo;Hibernate in the wrong hands can be a real disaster!&rdquo;</em>. Below I list another examples of Hibernate surprising behaviors:</p>
+
+<ul>
+<li><a href="http://stackoverflow.com/questions/179259/why-does-hibernate-try-to-delete-when-i-try-to-update-insert">http://stackoverflow.com/questions/179259/why-does-hibernate-try-to-delete-when-i-try-to-update-insert</a></li>
+<li><a href="http://stackoverflow.com/questions/3316070/hibernate-why-does-a-change-of-bag-lead-to-strange-adds-and-deletes-in-the-data">http://stackoverflow.com/questions/3316070/hibernate-why-does-a-change-of-bag-lead-to-strange-adds-and-deletes-in-the-data</a></li>
+<li><a href="http://stackoverflow.com/questions/11081133/hibernate-why-insert-operation-is-performed-last-in-this-case">http://stackoverflow.com/questions/11081133/hibernate-why-insert-operation-is-performed-last-in-this-case</a></li>
+</ul>
+
+<h4 id="why-is-so-hard-to-make-sense-of-the-hibernate-mappings-through-annotations-why-a-programmatic-approach-through-a-fluent-api-or-dsl-is-not-offered">Why is so hard to make sense of the Hibernate mappings through annotations? Why a programmatic approach through a fluent API or DSL is not offered?</h4>
+
+<p>If somehow the relationship between your entities are not working as expected then all you have to do is play with those annotations and hope that it will work the same way you would hope for a better image by hitting the top of your TV in the old days. Annotations is just a little less bad than XML, but not much. Its complexity can easily get out of control in what is known as <em>Annotatiomania</em>, a term coined by Lukas Eder in his blog series below:</p>
+
+<ul>
+<li><a href="http://blog.jooq.org/2011/09/07/why-did-hibernatejpa-get-so-complex/">http://blog.jooq.org/2011/09/07/why-did-hibernatejpa-get-so-complex/</a></li>
+<li><a href="http://blog.jooq.org/2011/10/25/annotatiomania-next-level-jpa-and-jaxb-combined/">http://blog.jooq.org/2011/10/25/annotatiomania-next-level-jpa-and-jaxb-combined/</a></li>
+<li><a href="http://blog.jooq.org/2011/11/24/next-stop-on-the-annotatiomania-train-fetchgroups/">http://blog.jooq.org/2011/11/24/next-stop-on-the-annotatiomania-train-fetchgroups/</a></li>
+</ul>
+
+<h4 id="do-i-really-care-about-database-independency">Do I really care about database independency?</h4>
+
+<p>Your database is something you choose in the very beginning of your project and then stick to it to the very end. There is no point of being paranoid about database independence, not even for automated tests executed against a different database engine. Plus some good in-memory databases like H2 has <a href="http://www.h2database.com/html/features.html#compatibility">compatibility with other databases</a> so you can run your queries without a problem. Even if you run into a compatibility problem that just tells you that you should not be running your automated tests against a different database.</p>
+
+<h4 id="do-people-really-think-that-without-hibernate-you-have-to-write-a-lot-of-sql-and-jdbc-boilerplate">Do people really think that without Hibernate you have to write a lot of SQL and JDBC boilerplate?</h4>
+
+<p>People who think like that were probably so busy learning Hibernate that they missed the alternative movement of query builders or worse, don’t understand the wonders that reflection, proxies and abstraction can do to simplify things. Check the code below which performs a SQL query:</p>
+
+<pre><code class="language-Java">Connection conn = getConnection();
+BeanSession session = getBeanSession(conn);
+PreparedStatement stmt = null;
+ResultSet rset = null;
+
+try {
+
+    TableAlias&lt;User&gt; userAlias = beanSession.createTableAlias(User.class);
+    User user = userAlias.proxy();
+
+    SQLBuilder sql = new SQLBuilder(userAlias);
+    sql.append(&quot;select &quot;);
+    sql.append(userAlias.columns());
+    sql.append(&quot; from &quot;).append(userAlias.tableName());
+    sql.append(&quot; where &quot;).column(user.getName()).append(&quot; like ?&quot;);
+    sql.append(&quot; and &quot;).column(user.getId()).append(&quot; &gt; ?&quot;);
+    sql.append(&quot; order by &quot;).column(user.getName()).append(&quot; desc&quot;);
+
+    stmt = SQLUtils.prepare(conn, sql.toString(), &quot;M%&quot;, 11); // varargs for params
+
+    rset = stmt.executeQuery();
+
+    List&lt;User&gt; users = new LinkedList&lt;User&gt;();
+
+    while(rset.next()) {
+        User u = new User();
+        beanSession.populateBean(rset, u);
+        users.add(u);
+    }
+ 
+    System.out.println(&quot;Total number of users loaded: &quot; + users.size());
+ 
+} finally {
+    SQLUtils.close(rset, stmt, conn);
+}
+</code></pre>
+
+<h3 id="so-what-is-the-alternative">So what is the alternative?</h3>
+
+<p>It is any non-intrusive framework that gives you control without complexity through abstraction. I am going to suggest <a href="https://github.com/saoj/mentabean">MentaBean</a>, of which I am the creator, but there are also others like <a href="http://www.jooq.org/">jOOQ</a>, <a href="http://blog.mybatis.org/">myBatis</a>, <a href="https://code.google.com/archive/p/ollin/">Ollin</a>, etc. MentaBean is a straightforward ORM (Object-Relational Mapping) framework for those who want to work with SQL without the JDBC boilerplate. Differently than other ORMs it keeps the magic to a minimum so you always know what is going on under the hood. MentaBean automates CRUD operations without any SQL, but it will not make you learn a new language when you need to query. Instead it helps you build your queries using SQL without the boring parts. It also does the object-to-database mappings programmatically through a fluent API. With MentaBean you don’t have to worry about XML programming or Annotation hell because the mappings are done with Java code. So if you like and understand SQL and are tired of the huge learning curve and unpredictable behavior offered by other complex ORM frameworks you should try MentaBean for a simplicity break.</p>
+
+<h3 id="conclusion">Conclusion</h3>
+
+<p>I expect that some people will say that I just don’t get the benefits of Hibernate and that I don’t know how to use it. Although there might be some truth in that statement, as a matter of principles no benefit is justified with the drawback of complexity. A solid foundation focused on simplicity is what guarantees the success of a software system in the long-run. Hibernate is so big, powerful and complex that it can easily get out of control. If the focus is simplicity and control, other better alternatives like MentaBean should be considered.</p>
+
+</div>
+
+        <footer class="post-footer clearfix">
+    
+
+    
+</footer>
+
+
+        <div id="disqus_thread"></div>
+<script type="text/javascript">
+
+(function() {
+    
+    
+    if (window.location.hostname == "localhost")
+        return;
+
+    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+    var disqus_shortname = 'mentablog';
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+})();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com/" class="dsq-brlink"></a>
+
+
+    </article>
+</div>
+
+            </div>
+        </div>
+
+        <footer class="footer">
+            <div class="container">
+                <div class="site-title-wrapper">
+                    <h1 class="site-title">
+                        <a title="Menta Blog" href="http://blog.soliveirajr.com/">Menta Blog</a>
+                    </h1>
+                    <a class="button-square button-jump-top js-jump-top" href="#">
+                        <i class="fa fa-angle-up"></i>
+                    </a>
+                </div>
+
+                <p class="footer-copyright">
+                    <span>Sergio Oliveira Jr. &copy; 2016 / Powered by <a href="https://gohugo.io/">Hugo</a></span>
+                </p>
+                
+            </div>
+        </footer>
+
+        <script src="http://blog.soliveirajr.com/js/jquery-1.11.3.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.5/highlight.min.js"></script>
+        <script src="http://blog.soliveirajr.com/js/jquery.fitvids.js"></script>
+        <script src="http://blog.soliveirajr.com/js/scripts.js"></script>
+        <script src="http://blog.soliveirajr.com/js/prism.js"></script>
+    </body>
+</html>
+

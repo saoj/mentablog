@@ -29,6 +29,16 @@ beanManager.bean(User.class, &amp;quot;users&amp;quot;) // table name is &amp;qu
     </item>
     
     <item>
+      <title>Intro to parallel processing with MapReduce</title>
+      <link>http://blog.soliveirajr.com/intro-to-parallel-processing-with-mapreduce/</link>
+      <pubDate>Sun, 13 Jan 2013 15:49:48 -0600</pubDate>
+      
+      <guid>http://blog.soliveirajr.com/intro-to-parallel-processing-with-mapreduce/</guid>
+      <description>&lt;p&gt;What is Google?&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
       <title>Hibernate is more complex than the problem it tries to solve</title>
       <link>http://blog.soliveirajr.com/hibernate-is-more-complex-than-the-problem-it-tries-to-solve/</link>
       <pubDate>Tue, 13 Nov 2012 15:49:48 -0600</pubDate>

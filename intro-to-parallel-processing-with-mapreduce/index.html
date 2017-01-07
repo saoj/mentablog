@@ -4,14 +4,14 @@
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
         <title>Intro to parallel processing with MapReduce &middot; Sergio Oliveira Jr.</title>
-        <meta name="description" content="What is Google?">
+        <meta name="description" content="What is Google? You can say it is a system that indexes Internet web pages so you can later find them by searching using keywords. That was easy. But how does Google index billion of web pages efficiently? The answer is by employing massive parallelization through MapReduce. In this article I describe a simple problem and proceed to solve it with and without MapReduce. Then to finalize I show how MapReduce makes it straightforward to distribute the work in a cluster for parallel processing.">
         <meta name="HandheldFriendly" content="True">
         <meta name="MobileOptimized" content="320">
         <meta name="generator" content="Hugo 0.17" />
         <meta name="robots" content="index,follow">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta property="og:title" content="Intro to parallel processing with MapReduce">
-<meta property="og:description" content="What is Google?">
+<meta property="og:description" content="What is Google? You can say it is a system that indexes Internet web pages so you can later find them by searching using keywords. That was easy. But how does Google index billion of web pages efficiently? The answer is by employing massive parallelization through MapReduce. In this article I describe a simple problem and proceed to solve it with and without MapReduce. Then to finalize I show how MapReduce makes it straightforward to distribute the work in a cluster for parallel processing.">
 <meta property="og:type" content="article">
 <meta property="og:url" content="http://blog.soliveirajr.com/intro-to-parallel-processing-with-mapreduce/">
         <link rel="stylesheet" href="http://blog.soliveirajr.com/css/normalize.css">
@@ -82,7 +82,445 @@
         <div class="post-content clearfix" itemprop="articleBody">
     
 
-    <p>What is Google?</p>
+    
+
+<p>What is <em>Google</em>? You can say it is a system that indexes Internet web pages so you can later find them by searching using keywords. That was easy. But <em>how does Google index billion of web pages efficiently?</em> The answer is by employing massive parallelization through <em>MapReduce</em>. In this article I describe a simple problem and proceed to solve it <strong>with and without MapReduce</strong>. Then to finalize I show how MapReduce makes it straightforward to distribute the work in a cluster for <strong>parallel processing</strong>.</p>
+
+<h3 id="the-problem-in-english">The Problem (in English)</h3>
+
+<p>I want to index files by word so I can later search and return all files that contain a given word together with the number of occurrences of that word. So a simple INPUT could be three files:</p>
+
+<pre><code>file1.txt =&gt; &quot;foo foo bar cat dog dog&quot;
+file2.txt =&gt; &quot;foo house cat cat dog&quot;
+file3.txt =&gt; &quot;foo bird foo foo&quot;
+</code></pre>
+
+<p>The OUTPUT is a hash map indexing each word to the files that contain that word, together with a counter for the number of occurrences of that word in the file. So for the three files above, we would end up with the following hash map:</p>
+
+<pre><code>bar =&gt; [ (file1.txt, 1) ]
+foo =&gt; [ (file1.txt, 2), (file3.txt, 3), (file2.txt, 1) ]
+cat =&gt; [ (file1.txt, 1), (file2.txt, 2) ]
+bird =&gt; [ (file3.txt, 1) ]
+dog =&gt; [ (file1.txt, 2), (file2.txt, 1) ]
+house =&gt; [ (file2.txt, 1) ]
+</code></pre>
+
+<p>So from the hash map above you can quickly tell that the word &ldquo;<em>cat</em>&rdquo; is present on two files: &ldquo;<em>file1.txt</em>&rdquo; and &ldquo;<em>file2.txt</em>&rdquo;. In addition you know that in &ldquo;<em>file2.txt</em>&rdquo; it occurs two times and in &ldquo;<em>file1.txt</em>&rdquo; it occurs one time. The bottom line is that by building this hash map beforehand, you can quickly perform searches without having to scan through the entire content of your web pages each time.</p>
+
+<h3 id="the-problem-in-code">The Problem (in Code)</h3>
+
+<pre><code class="language-Java">public class FileMatch {
+
+	private final String filename;
+	private int occurrences;
+
+	public FileMatch(String filename) {
+		this.filename = filename;
+		this.occurrences = 0;
+	}
+
+	public void inc() {
+		this.occurrences++;
+	}
+
+	public String getFilename() {
+		return filename;
+	}
+
+	public int getOccurrences() {
+		return occurrences;
+	}
+
+	@Override
+	public String toString() {
+		return &quot;(&quot; + filename + &quot;, &quot; + occurrences + &quot;)&quot;;
+	}
+}
+</code></pre>
+
+<p>So our index represented by a hash map will be something like:</p>
+
+<pre><code class="language-Java">// word =&gt; filename =&gt; FileMatch
+Map&lt;String, Map&lt;String, FileMatch&gt;&gt; index = new HashMap&lt;String, Map&lt;String, FileMatch&gt;&gt;();
+</code></pre>
+
+<h3 id="approach-1-without-mapreduce">Approach #1: Without MapReduce</h3>
+
+<p>In this first approach we just count word by word, in a loop, filling our hash map with the results.</p>
+
+<pre><code class="language-Java">public class WithoutMapReduce {
+
+	public static void main(String[] args) {
+
+		Map&lt;String, Map&lt;String, FileMatch&gt;&gt; index = new HashMap&lt;String, Map&lt;String, FileMatch&gt;&gt;();
+
+		addToIndex(&quot;file1.txt&quot;, &quot;foo foo bar cat dog dog&quot;, index);
+		addToIndex(&quot;file2.txt&quot;, &quot;foo house cat cat dog&quot;, index);
+		addToIndex(&quot;file3.txt&quot;, &quot;foo bird foo foo&quot;, index);
+
+		printIndex(index);
+	}
+
+	public static void addToIndex(final String filename,
+                                final String fileContents,   
+                                final Map&lt;String, Map&lt;String, FileMatch&gt;&gt; index) {
+
+		String[] words = fileContents.split(&quot;\\s+&quot;);
+
+		for(String word: words) {
+
+			Map&lt;String, FileMatch&gt; fileMatches = index.get(word);
+
+			if (fileMatches == null) {
+				fileMatches = new HashMap&lt;String, FileMatch&gt;();
+				index.put(word, fileMatches);
+			}
+
+			FileMatch fileMatch = fileMatches.get(filename);
+
+			if (fileMatch == null) {
+				fileMatch = new FileMatch(filename);
+				fileMatches.put(filename, fileMatch);
+			}
+
+			fileMatch.inc();
+		}
+	}
+
+	public static void printIndex(Map&lt;String, Map&lt;String, FileMatch&gt;&gt; index) {
+		  // omitted for clarity...
+  }
+}
+</code></pre>
+
+<h3 id="approach-2-with-mapreduce">Approach #2: With MapReduce</h3>
+
+<p>So <em>MapReduce</em> takes the problem above and breaks it down in two independent phases: the <strong>Map phase</strong> and the <strong>Reduce phase</strong>. In practice there is a third pre-reduce phase called <em>Grouping</em>, but the only phases that get parallelized as we will see with approach #3 are the map and reduce phases.</p>
+
+<h5 id="map">Map</h5>
+
+<pre><code class="language-Java">// MAP:
+
+List&lt;MappedItem&gt; mappedItems = new LinkedList&lt;MappedItem&gt;();
+
+mappedItems.addAll(map(&quot;file1.txt&quot;, &quot;foo foo bar cat dog dog&quot;));
+mappedItems.addAll(map(&quot;file2.txt&quot;, &quot;foo house cat cat dog&quot;));
+mappedItems.addAll(map(&quot;file3.txt&quot;, &quot;foo bird foo foo&quot;));
+</code></pre>
+
+<p>Above you can see that we execute the <em>Map</em> operation on all files, creating a list of <code>MappedItem</code>s:</p>
+
+<pre><code class="language-Java">public class MappedItem {
+
+    private final String word;
+    private final String file;
+
+    public MappedItem(String word, String file) {
+        this.word = word;
+        this.file = file;
+    }
+
+    public String getWord() {
+        return word;
+    }
+
+    public String getFile() {
+        return file;
+    }
+
+    @Override
+    public String toString() {
+    	return &quot;(&quot; + word + &quot;, &quot; + file + &quot;)&quot;;
+    }
+}
+</code></pre>
+
+<p>The important code is the <code>map</code> method, showed below:</p>
+
+<pre><code class="language-Java">public static List&lt;MappedItem&gt; map(final String filename, final String fileContents) {
+
+  List&lt;MappedItem&gt; mappedItems = new LinkedList&lt;MappedItem&gt;();
+
+  String[] words = fileContents.split(&quot;\\s+&quot;);
+
+    for(String word: words) {
+        mappedItems.add(new MappedItem(word, filename));
+    }
+
+    return mappedItems;
+}
+</code></pre>
+
+<p>It is important to understand that the <em>Map phase</em> returns a list of key/value pairs. In our example the key is a word and the value is the file where this word was found. It is also important to notice that the list will have duplicates. For example the item (foo, file3.txt) appears three times in the list because the word “foo” appears in the file three times. Below is the OUTPUT you should expect from the mapping phase:</p>
+
+<pre><code>[(foo, file1.txt), (foo, file1.txt), (bar, file1.txt), (cat, file1.txt), (dog, file1.txt),
+(dog, file1.txt), (foo, file2.txt), (house, file2.txt), (cat, file2.txt), (cat, file2.txt),
+(dog, file2.txt), (foo, file3.txt), (bird, file3.txt), (foo, file3.txt), (foo, file3.txt)]
+</code></pre>
+
+<h5 id="grouping">Grouping</h5>
+
+<p>The intermediate phase of <em>MapReduce</em> is the <strong>grouping</strong> phase where the map results are grouped and prepared for the reduce phase. In that phase, you go from a <code>List&lt;MappedItem&gt;</code> to a <code>Map&lt;String, List&lt;String&gt;&gt;</code>:</p>
+
+<pre><code class="language-Java">// GROUP:
+
+Map&lt;String, List&lt;String&gt;&gt; groupedItems = group(mappedItems);
+</code></pre>
+
+<p>The <code>group</code> method is described below:</p>
+
+<pre><code class="language-Java">public static Map&lt;String, List&lt;String&gt;&gt; group(List&lt;MappedItem&gt; mappedItems) {
+
+    Map&lt;String, List&lt;String&gt;&gt; groupedItems = new HashMap&lt;String, List&lt;String&gt;&gt;();
+
+    Iterator&lt;MappedItem&gt; iter = mappedItems.iterator();
+
+    while(iter.hasNext()) {
+
+        MappedItem item = iter.next();
+
+        String word = item.getWord();
+        String file = item.getFile();
+
+        List&lt;String&gt; list = groupedItems.get(word);
+
+        if (list == null) {
+            list = new LinkedList&lt;String&gt;();
+            groupedItems.put(word, list);
+        }
+
+        list.add(file);
+    }
+
+    return groupedItems;
+}
+</code></pre>
+
+<p>The output of the <em>Grouping phase</em> is the output of the mapping phase without the duplicates, in other words, the list produced by the mapping phase becomes a map pointing to a list of files, as you can see below:</p>
+
+<pre><code>{bar=[file1.txt], foo=[file1.txt, file1.txt, file2.txt, file3.txt, file3.txt, file3.txt],
+cat=[file1.txt, file2.txt, file2.txt], bird=[file3.txt], dog=[file1.txt, file1.txt, file2.txt],
+house=[file2.txt]}
+</code></pre>
+
+<h5 id="reduce">Reduce</h5>
+
+<p>In the final <em>Reduce phase</em>, the map entries produced by the grouping phase are reduced to the output we are looking for with the code below:</p>
+
+<pre><code class="language-Java">Map&lt;String, Map&lt;String, FileMatch&gt;&gt; index = new HashMap&lt;String, Map&lt;String, FileMatch&gt;&gt;();
+
+Iterator&lt;Entry&lt;String, List&lt;String&gt;&gt;&gt; groupedIter = groupedItems.entrySet().iterator();
+
+while(groupedIter.hasNext()) {
+
+    Entry&lt;String, List&lt;String&gt;&gt; entry = groupedIter.next();
+
+    String word = entry.getKey();
+    List&lt;String&gt; list = entry.getValue();
+
+    // REDUCE:
+
+    Map&lt;String, FileMatch&gt; reducedMap = reduce(word, list);
+
+    index.put(word, reducedMap);
+}
+</code></pre>
+
+<p>And the <code>reduce</code> method:</p>
+
+<pre><code class="language-Java">public static Map&lt;String, FileMatch&gt; reduce(String word, List&lt;String&gt; list) {
+
+  Map&lt;String, FileMatch&gt; reducedMap = new HashMap&lt;String, FileMatch&gt;();
+
+  for (String filename : list) {
+
+    FileMatch fileMatch = reducedMap.get(filename);
+
+    if (fileMatch == null) {
+      fileMatch = new FileMatch(filename);
+      reducedMap.put(filename, fileMatch);
+    }
+
+    fileMatch.inc();
+  }
+
+  return reducedMap;
+}
+</code></pre>
+
+<p>Note that the <code>reduce</code> method creates an entry for each word in our final hash map (i.e. index). That said, after the map, grouping and reduce phases, our final OUTPUT is the same as before:</p>
+
+<pre><code>bar =&gt; [ (file1.txt, 1) ]
+foo =&gt; [ (file1.txt, 2), (file3.txt, 3), (file2.txt, 1) ]
+cat =&gt; [ (file1.txt, 1), (file2.txt, 2) ]
+bird =&gt; [ (file3.txt, 1) ]
+dog =&gt; [ (file1.txt, 2), (file2.txt, 1) ]
+house =&gt; [ (file2.txt, 1) ]
+</code></pre>
+
+<h3 id="approach-3-mapreduce-with-parallelization">Approach #3: MapReduce with Parallelization</h3>
+
+<p>So why go through the trouble of MapReduce? The answer is <strong>massive parallelization</strong>. If you take a look on our previous MapReduce solution, you will notice that the map and reduce work can be easily broken down in independent jobs and distributed across a cluster of machines that can perform the work in parallel. Let’s change our code to make this point clear and introduce two callback interfaces that will allow us to be notified by the cluster when the work is ready:</p>
+
+<pre><code class="language-Java">public interface MapCallback {
+
+    public void mapDone(String filename, List&lt;MappedItem&gt; values);
+}
+</code></pre>
+
+<pre><code class="language-Java">public interface ReduceCallback {
+
+    public void reduceDone(String word, Map&lt;String, FileMatch&gt; reducedMap);
+}
+</code></pre>
+
+<p>Modifying our <code>map</code> and <code>reduce</code> methods to use the callbacks above, we have:</p>
+
+<pre><code class="language-Java">public static Thread map(final String filename, final String fileContents,
+                                            final MapCallback mapCallback) {
+
+  Thread t = new Thread(new Runnable() {
+
+    @Override
+    public void run() {
+
+      List&lt;MappedItem&gt; mappedItems = new LinkedList&lt;MappedItem&gt;();
+
+      String[] words = fileContents.split(&quot;\\s+&quot;);
+
+        for(String word: words) {
+            mappedItems.add(new MappedItem(word, filename));
+        }
+
+        mapCallback.mapDone(filename, mappedItems);
+
+    }
+  });
+
+  t.start();
+
+  return t;
+}
+</code></pre>
+
+<pre><code class="language-Java">public static Thread reduce(final String word, final List&lt;String&gt; list,
+                                    final ReduceCallback reduceCallback) {
+
+  Thread t = new Thread(new Runnable() {
+
+    @Override
+    public void run() {
+
+      Map&lt;String, FileMatch&gt; reducedMap = new HashMap&lt;String, FileMatch&gt;();
+
+      for (String filename : list) {
+
+        FileMatch fileMatch = reducedMap.get(filename);
+
+        if (fileMatch == null) {
+          fileMatch = new FileMatch(filename);
+          reducedMap.put(filename, fileMatch);
+        }
+
+        fileMatch.inc();
+      }
+
+      reduceCallback.reduceDone(word, reducedMap);
+    }
+  });
+
+  t.start();
+
+  return t;
+}
+</code></pre>
+
+<p>Note that to simulate a cluster of machines we are using threads to process the work independently and in parallel. Once each thread finishes its work, it uses the callback to deliver the results back to the caller of the <code>map</code> and <code>reduce</code> methods.</p>
+
+<p>To wait for all threads to complete, we can use the <code>join()</code> method:</p>
+
+<pre><code class="language-Java">public static void waitForAllThreadsToFinish(List&lt;Thread&gt; threads) {
+  try {
+    for(Thread t: threads) t.join();
+  } catch(InterruptedException e) {
+    throw new RuntimeException(e);
+  }
+}
+</code></pre>
+
+<p>So now the MapReduce flow, with parallelization through threads, becomes:</p>
+
+<pre><code class="language-Java">public static void main(String[] args) {
+
+    // MAP:
+
+    final List&lt;MappedItem&gt; mappedItems = new LinkedList&lt;MappedItem&gt;();
+
+    MapCallback mapCallback = new MapCallback() {
+
+        @Override
+        public synchronized void mapDone(String filename, List&lt;MappedItem&gt; values) {
+            mappedItems.addAll(values);
+        }
+    };
+
+    List&lt;Thread&gt; mapThreads = new LinkedList&lt;Thread&gt;();
+
+    mapThreads.add(map(&quot;file1.txt&quot;, &quot;foo foo bar cat dog dog&quot;, mapCallback));
+    mapThreads.add(map(&quot;file2.txt&quot;, &quot;foo house cat cat dog&quot;, mapCallback));
+    mapThreads.add(map(&quot;file3.txt&quot;, &quot;foo bird foo foo&quot;, mapCallback));
+
+    waitForAllThreadsToFinish(mapThreads); // blocking call...
+
+    System.out.println(mappedItems);
+
+    // GROUP:
+
+    Map&lt;String, List&lt;String&gt;&gt; groupedItems = group(mappedItems);
+
+    System.out.println(groupedItems);
+
+    final Map&lt;String, Map&lt;String, FileMatch&gt;&gt; index = new HashMap&lt;String,
+                                        Map&lt;String, FileMatch&gt;&gt;();
+
+    ReduceCallback reduceCallback = new ReduceCallback() {
+
+        @Override
+        public synchronized void reduceDone(String word,
+                            Map&lt;String, FileMatch&gt; reducedMap) {
+            index.put(word, reducedMap);
+        }
+    };
+
+    List&lt;Thread&gt; reduceThreads = new LinkedList&lt;Thread&gt;();
+
+    Iterator&lt;Entry&lt;String, List&lt;String&gt;&gt;&gt; groupedIter = groupedItems.entrySet().iterator();
+
+    while(groupedIter.hasNext()) {
+
+        Entry&lt;String, List&lt;String&gt;&gt; entry = groupedIter.next();
+
+        String word = entry.getKey();
+        List&lt;String&gt; list = entry.getValue();
+
+        // REDUCE:
+
+        reduceThreads.add(reduce(word, list, reduceCallback));
+    }
+
+    waitForAllThreadsToFinish(reduceThreads); // blocking call...
+
+    printIndex(index);
+}
+</code></pre>
+
+<p>Notice that each job sent to a thread has a unique identifier. For the map phase it is the filename and for the reduce phase it is the word. It would not be hard to simulate a cluster <em>node failure</em> by timing out a thread that is taking too long and then re-send the job to another thread. That’s what frameworks like Hadoop and MongoDB do.</p>
+
+<p><strong>Note:</strong> The complete source code is available at <a href="https://github.com/saoj/mapreduce">https://github.com/saoj/mapreduce</a></p>
+
+<h3 id="conclusion">Conclusion</h3>
+
+<p>MapReduce breaks the process of indexing data in two steps: <strong>map</strong> and <strong>reduce</strong>. The map step needs to be completed before the reduce step, but each step can be broken down in small pieces that are executed in parallel. When you have a large data set, the ability to use a cluster and scale horizontally becomes crucial. Frameworks like Hadoop and MongoDB can manage the execution of a MapReduce operation in a cluster of computers with support for fault-tolerance. The complexity becomes hidden from the developer who only has to worry about implementing the map and reduce functions to index the data set in any way he wants to.</p>
 
 </div>
 

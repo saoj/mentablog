@@ -34,7 +34,445 @@ beanManager.bean(User.class, &amp;quot;users&amp;quot;) // table name is &amp;qu
       <pubDate>Sun, 13 Jan 2013 15:49:48 -0600</pubDate>
       
       <guid>http://blog.soliveirajr.com/intro-to-parallel-processing-with-mapreduce/</guid>
-      <description>&lt;p&gt;What is Google?&lt;/p&gt;
+      <description>
+
+&lt;p&gt;What is &lt;em&gt;Google&lt;/em&gt;? You can say it is a system that indexes Internet web pages so you can later find them by searching using keywords. That was easy. But &lt;em&gt;how does Google index billion of web pages efficiently?&lt;/em&gt; The answer is by employing massive parallelization through &lt;em&gt;MapReduce&lt;/em&gt;. In this article I describe a simple problem and proceed to solve it &lt;strong&gt;with and without MapReduce&lt;/strong&gt;. Then to finalize I show how MapReduce makes it straightforward to distribute the work in a cluster for &lt;strong&gt;parallel processing&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;h3 id=&#34;the-problem-in-english&#34;&gt;The Problem (in English)&lt;/h3&gt;
+
+&lt;p&gt;I want to index files by word so I can later search and return all files that contain a given word together with the number of occurrences of that word. So a simple INPUT could be three files:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;file1.txt =&amp;gt; &amp;quot;foo foo bar cat dog dog&amp;quot;
+file2.txt =&amp;gt; &amp;quot;foo house cat cat dog&amp;quot;
+file3.txt =&amp;gt; &amp;quot;foo bird foo foo&amp;quot;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The OUTPUT is a hash map indexing each word to the files that contain that word, together with a counter for the number of occurrences of that word in the file. So for the three files above, we would end up with the following hash map:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;bar =&amp;gt; [ (file1.txt, 1) ]
+foo =&amp;gt; [ (file1.txt, 2), (file3.txt, 3), (file2.txt, 1) ]
+cat =&amp;gt; [ (file1.txt, 1), (file2.txt, 2) ]
+bird =&amp;gt; [ (file3.txt, 1) ]
+dog =&amp;gt; [ (file1.txt, 2), (file2.txt, 1) ]
+house =&amp;gt; [ (file2.txt, 1) ]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So from the hash map above you can quickly tell that the word &amp;ldquo;&lt;em&gt;cat&lt;/em&gt;&amp;rdquo; is present on two files: &amp;ldquo;&lt;em&gt;file1.txt&lt;/em&gt;&amp;rdquo; and &amp;ldquo;&lt;em&gt;file2.txt&lt;/em&gt;&amp;rdquo;. In addition you know that in &amp;ldquo;&lt;em&gt;file2.txt&lt;/em&gt;&amp;rdquo; it occurs two times and in &amp;ldquo;&lt;em&gt;file1.txt&lt;/em&gt;&amp;rdquo; it occurs one time. The bottom line is that by building this hash map beforehand, you can quickly perform searches without having to scan through the entire content of your web pages each time.&lt;/p&gt;
+
+&lt;h3 id=&#34;the-problem-in-code&#34;&gt;The Problem (in Code)&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public class FileMatch {
+
+	private final String filename;
+	private int occurrences;
+
+	public FileMatch(String filename) {
+		this.filename = filename;
+		this.occurrences = 0;
+	}
+
+	public void inc() {
+		this.occurrences++;
+	}
+
+	public String getFilename() {
+		return filename;
+	}
+
+	public int getOccurrences() {
+		return occurrences;
+	}
+
+	@Override
+	public String toString() {
+		return &amp;quot;(&amp;quot; + filename + &amp;quot;, &amp;quot; + occurrences + &amp;quot;)&amp;quot;;
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So our index represented by a hash map will be something like:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;// word =&amp;gt; filename =&amp;gt; FileMatch
+Map&amp;lt;String, Map&amp;lt;String, FileMatch&amp;gt;&amp;gt; index = new HashMap&amp;lt;String, Map&amp;lt;String, FileMatch&amp;gt;&amp;gt;();
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;approach-1-without-mapreduce&#34;&gt;Approach #1: Without MapReduce&lt;/h3&gt;
+
+&lt;p&gt;In this first approach we just count word by word, in a loop, filling our hash map with the results.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public class WithoutMapReduce {
+
+	public static void main(String[] args) {
+
+		Map&amp;lt;String, Map&amp;lt;String, FileMatch&amp;gt;&amp;gt; index = new HashMap&amp;lt;String, Map&amp;lt;String, FileMatch&amp;gt;&amp;gt;();
+
+		addToIndex(&amp;quot;file1.txt&amp;quot;, &amp;quot;foo foo bar cat dog dog&amp;quot;, index);
+		addToIndex(&amp;quot;file2.txt&amp;quot;, &amp;quot;foo house cat cat dog&amp;quot;, index);
+		addToIndex(&amp;quot;file3.txt&amp;quot;, &amp;quot;foo bird foo foo&amp;quot;, index);
+
+		printIndex(index);
+	}
+
+	public static void addToIndex(final String filename,
+                                final String fileContents,   
+                                final Map&amp;lt;String, Map&amp;lt;String, FileMatch&amp;gt;&amp;gt; index) {
+
+		String[] words = fileContents.split(&amp;quot;\\s+&amp;quot;);
+
+		for(String word: words) {
+
+			Map&amp;lt;String, FileMatch&amp;gt; fileMatches = index.get(word);
+
+			if (fileMatches == null) {
+				fileMatches = new HashMap&amp;lt;String, FileMatch&amp;gt;();
+				index.put(word, fileMatches);
+			}
+
+			FileMatch fileMatch = fileMatches.get(filename);
+
+			if (fileMatch == null) {
+				fileMatch = new FileMatch(filename);
+				fileMatches.put(filename, fileMatch);
+			}
+
+			fileMatch.inc();
+		}
+	}
+
+	public static void printIndex(Map&amp;lt;String, Map&amp;lt;String, FileMatch&amp;gt;&amp;gt; index) {
+		  // omitted for clarity...
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;approach-2-with-mapreduce&#34;&gt;Approach #2: With MapReduce&lt;/h3&gt;
+
+&lt;p&gt;So &lt;em&gt;MapReduce&lt;/em&gt; takes the problem above and breaks it down in two independent phases: the &lt;strong&gt;Map phase&lt;/strong&gt; and the &lt;strong&gt;Reduce phase&lt;/strong&gt;. In practice there is a third pre-reduce phase called &lt;em&gt;Grouping&lt;/em&gt;, but the only phases that get parallelized as we will see with approach #3 are the map and reduce phases.&lt;/p&gt;
+
+&lt;h5 id=&#34;map&#34;&gt;Map&lt;/h5&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;// MAP:
+
+List&amp;lt;MappedItem&amp;gt; mappedItems = new LinkedList&amp;lt;MappedItem&amp;gt;();
+
+mappedItems.addAll(map(&amp;quot;file1.txt&amp;quot;, &amp;quot;foo foo bar cat dog dog&amp;quot;));
+mappedItems.addAll(map(&amp;quot;file2.txt&amp;quot;, &amp;quot;foo house cat cat dog&amp;quot;));
+mappedItems.addAll(map(&amp;quot;file3.txt&amp;quot;, &amp;quot;foo bird foo foo&amp;quot;));
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Above you can see that we execute the &lt;em&gt;Map&lt;/em&gt; operation on all files, creating a list of &lt;code&gt;MappedItem&lt;/code&gt;s:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public class MappedItem {
+
+    private final String word;
+    private final String file;
+
+    public MappedItem(String word, String file) {
+        this.word = word;
+        this.file = file;
+    }
+
+    public String getWord() {
+        return word;
+    }
+
+    public String getFile() {
+        return file;
+    }
+
+    @Override
+    public String toString() {
+    	return &amp;quot;(&amp;quot; + word + &amp;quot;, &amp;quot; + file + &amp;quot;)&amp;quot;;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The important code is the &lt;code&gt;map&lt;/code&gt; method, showed below:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public static List&amp;lt;MappedItem&amp;gt; map(final String filename, final String fileContents) {
+
+  List&amp;lt;MappedItem&amp;gt; mappedItems = new LinkedList&amp;lt;MappedItem&amp;gt;();
+
+  String[] words = fileContents.split(&amp;quot;\\s+&amp;quot;);
+
+    for(String word: words) {
+        mappedItems.add(new MappedItem(word, filename));
+    }
+
+    return mappedItems;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;It is important to understand that the &lt;em&gt;Map phase&lt;/em&gt; returns a list of key/value pairs. In our example the key is a word and the value is the file where this word was found. It is also important to notice that the list will have duplicates. For example the item (foo, file3.txt) appears three times in the list because the word “foo” appears in the file three times. Below is the OUTPUT you should expect from the mapping phase:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;[(foo, file1.txt), (foo, file1.txt), (bar, file1.txt), (cat, file1.txt), (dog, file1.txt),
+(dog, file1.txt), (foo, file2.txt), (house, file2.txt), (cat, file2.txt), (cat, file2.txt),
+(dog, file2.txt), (foo, file3.txt), (bird, file3.txt), (foo, file3.txt), (foo, file3.txt)]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h5 id=&#34;grouping&#34;&gt;Grouping&lt;/h5&gt;
+
+&lt;p&gt;The intermediate phase of &lt;em&gt;MapReduce&lt;/em&gt; is the &lt;strong&gt;grouping&lt;/strong&gt; phase where the map results are grouped and prepared for the reduce phase. In that phase, you go from a &lt;code&gt;List&amp;lt;MappedItem&amp;gt;&lt;/code&gt; to a &lt;code&gt;Map&amp;lt;String, List&amp;lt;String&amp;gt;&amp;gt;&lt;/code&gt;:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;// GROUP:
+
+Map&amp;lt;String, List&amp;lt;String&amp;gt;&amp;gt; groupedItems = group(mappedItems);
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The &lt;code&gt;group&lt;/code&gt; method is described below:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public static Map&amp;lt;String, List&amp;lt;String&amp;gt;&amp;gt; group(List&amp;lt;MappedItem&amp;gt; mappedItems) {
+
+    Map&amp;lt;String, List&amp;lt;String&amp;gt;&amp;gt; groupedItems = new HashMap&amp;lt;String, List&amp;lt;String&amp;gt;&amp;gt;();
+
+    Iterator&amp;lt;MappedItem&amp;gt; iter = mappedItems.iterator();
+
+    while(iter.hasNext()) {
+
+        MappedItem item = iter.next();
+
+        String word = item.getWord();
+        String file = item.getFile();
+
+        List&amp;lt;String&amp;gt; list = groupedItems.get(word);
+
+        if (list == null) {
+            list = new LinkedList&amp;lt;String&amp;gt;();
+            groupedItems.put(word, list);
+        }
+
+        list.add(file);
+    }
+
+    return groupedItems;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The output of the &lt;em&gt;Grouping phase&lt;/em&gt; is the output of the mapping phase without the duplicates, in other words, the list produced by the mapping phase becomes a map pointing to a list of files, as you can see below:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;{bar=[file1.txt], foo=[file1.txt, file1.txt, file2.txt, file3.txt, file3.txt, file3.txt],
+cat=[file1.txt, file2.txt, file2.txt], bird=[file3.txt], dog=[file1.txt, file1.txt, file2.txt],
+house=[file2.txt]}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h5 id=&#34;reduce&#34;&gt;Reduce&lt;/h5&gt;
+
+&lt;p&gt;In the final &lt;em&gt;Reduce phase&lt;/em&gt;, the map entries produced by the grouping phase are reduced to the output we are looking for with the code below:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;Map&amp;lt;String, Map&amp;lt;String, FileMatch&amp;gt;&amp;gt; index = new HashMap&amp;lt;String, Map&amp;lt;String, FileMatch&amp;gt;&amp;gt;();
+
+Iterator&amp;lt;Entry&amp;lt;String, List&amp;lt;String&amp;gt;&amp;gt;&amp;gt; groupedIter = groupedItems.entrySet().iterator();
+
+while(groupedIter.hasNext()) {
+
+    Entry&amp;lt;String, List&amp;lt;String&amp;gt;&amp;gt; entry = groupedIter.next();
+
+    String word = entry.getKey();
+    List&amp;lt;String&amp;gt; list = entry.getValue();
+
+    // REDUCE:
+
+    Map&amp;lt;String, FileMatch&amp;gt; reducedMap = reduce(word, list);
+
+    index.put(word, reducedMap);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;And the &lt;code&gt;reduce&lt;/code&gt; method:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public static Map&amp;lt;String, FileMatch&amp;gt; reduce(String word, List&amp;lt;String&amp;gt; list) {
+
+  Map&amp;lt;String, FileMatch&amp;gt; reducedMap = new HashMap&amp;lt;String, FileMatch&amp;gt;();
+
+  for (String filename : list) {
+
+    FileMatch fileMatch = reducedMap.get(filename);
+
+    if (fileMatch == null) {
+      fileMatch = new FileMatch(filename);
+      reducedMap.put(filename, fileMatch);
+    }
+
+    fileMatch.inc();
+  }
+
+  return reducedMap;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Note that the &lt;code&gt;reduce&lt;/code&gt; method creates an entry for each word in our final hash map (i.e. index). That said, after the map, grouping and reduce phases, our final OUTPUT is the same as before:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;bar =&amp;gt; [ (file1.txt, 1) ]
+foo =&amp;gt; [ (file1.txt, 2), (file3.txt, 3), (file2.txt, 1) ]
+cat =&amp;gt; [ (file1.txt, 1), (file2.txt, 2) ]
+bird =&amp;gt; [ (file3.txt, 1) ]
+dog =&amp;gt; [ (file1.txt, 2), (file2.txt, 1) ]
+house =&amp;gt; [ (file2.txt, 1) ]
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h3 id=&#34;approach-3-mapreduce-with-parallelization&#34;&gt;Approach #3: MapReduce with Parallelization&lt;/h3&gt;
+
+&lt;p&gt;So why go through the trouble of MapReduce? The answer is &lt;strong&gt;massive parallelization&lt;/strong&gt;. If you take a look on our previous MapReduce solution, you will notice that the map and reduce work can be easily broken down in independent jobs and distributed across a cluster of machines that can perform the work in parallel. Let’s change our code to make this point clear and introduce two callback interfaces that will allow us to be notified by the cluster when the work is ready:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public interface MapCallback {
+
+    public void mapDone(String filename, List&amp;lt;MappedItem&amp;gt; values);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public interface ReduceCallback {
+
+    public void reduceDone(String word, Map&amp;lt;String, FileMatch&amp;gt; reducedMap);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Modifying our &lt;code&gt;map&lt;/code&gt; and &lt;code&gt;reduce&lt;/code&gt; methods to use the callbacks above, we have:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public static Thread map(final String filename, final String fileContents,
+                                            final MapCallback mapCallback) {
+
+  Thread t = new Thread(new Runnable() {
+
+    @Override
+    public void run() {
+
+      List&amp;lt;MappedItem&amp;gt; mappedItems = new LinkedList&amp;lt;MappedItem&amp;gt;();
+
+      String[] words = fileContents.split(&amp;quot;\\s+&amp;quot;);
+
+        for(String word: words) {
+            mappedItems.add(new MappedItem(word, filename));
+        }
+
+        mapCallback.mapDone(filename, mappedItems);
+
+    }
+  });
+
+  t.start();
+
+  return t;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public static Thread reduce(final String word, final List&amp;lt;String&amp;gt; list,
+                                    final ReduceCallback reduceCallback) {
+
+  Thread t = new Thread(new Runnable() {
+
+    @Override
+    public void run() {
+
+      Map&amp;lt;String, FileMatch&amp;gt; reducedMap = new HashMap&amp;lt;String, FileMatch&amp;gt;();
+
+      for (String filename : list) {
+
+        FileMatch fileMatch = reducedMap.get(filename);
+
+        if (fileMatch == null) {
+          fileMatch = new FileMatch(filename);
+          reducedMap.put(filename, fileMatch);
+        }
+
+        fileMatch.inc();
+      }
+
+      reduceCallback.reduceDone(word, reducedMap);
+    }
+  });
+
+  t.start();
+
+  return t;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Note that to simulate a cluster of machines we are using threads to process the work independently and in parallel. Once each thread finishes its work, it uses the callback to deliver the results back to the caller of the &lt;code&gt;map&lt;/code&gt; and &lt;code&gt;reduce&lt;/code&gt; methods.&lt;/p&gt;
+
+&lt;p&gt;To wait for all threads to complete, we can use the &lt;code&gt;join()&lt;/code&gt; method:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public static void waitForAllThreadsToFinish(List&amp;lt;Thread&amp;gt; threads) {
+  try {
+    for(Thread t: threads) t.join();
+  } catch(InterruptedException e) {
+    throw new RuntimeException(e);
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;So now the MapReduce flow, with parallelization through threads, becomes:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-Java&#34;&gt;public static void main(String[] args) {
+
+    // MAP:
+
+    final List&amp;lt;MappedItem&amp;gt; mappedItems = new LinkedList&amp;lt;MappedItem&amp;gt;();
+
+    MapCallback mapCallback = new MapCallback() {
+
+        @Override
+        public synchronized void mapDone(String filename, List&amp;lt;MappedItem&amp;gt; values) {
+            mappedItems.addAll(values);
+        }
+    };
+
+    List&amp;lt;Thread&amp;gt; mapThreads = new LinkedList&amp;lt;Thread&amp;gt;();
+
+    mapThreads.add(map(&amp;quot;file1.txt&amp;quot;, &amp;quot;foo foo bar cat dog dog&amp;quot;, mapCallback));
+    mapThreads.add(map(&amp;quot;file2.txt&amp;quot;, &amp;quot;foo house cat cat dog&amp;quot;, mapCallback));
+    mapThreads.add(map(&amp;quot;file3.txt&amp;quot;, &amp;quot;foo bird foo foo&amp;quot;, mapCallback));
+
+    waitForAllThreadsToFinish(mapThreads); // blocking call...
+
+    System.out.println(mappedItems);
+
+    // GROUP:
+
+    Map&amp;lt;String, List&amp;lt;String&amp;gt;&amp;gt; groupedItems = group(mappedItems);
+
+    System.out.println(groupedItems);
+
+    final Map&amp;lt;String, Map&amp;lt;String, FileMatch&amp;gt;&amp;gt; index = new HashMap&amp;lt;String,
+                                        Map&amp;lt;String, FileMatch&amp;gt;&amp;gt;();
+
+    ReduceCallback reduceCallback = new ReduceCallback() {
+
+        @Override
+        public synchronized void reduceDone(String word,
+                            Map&amp;lt;String, FileMatch&amp;gt; reducedMap) {
+            index.put(word, reducedMap);
+        }
+    };
+
+    List&amp;lt;Thread&amp;gt; reduceThreads = new LinkedList&amp;lt;Thread&amp;gt;();
+
+    Iterator&amp;lt;Entry&amp;lt;String, List&amp;lt;String&amp;gt;&amp;gt;&amp;gt; groupedIter = groupedItems.entrySet().iterator();
+
+    while(groupedIter.hasNext()) {
+
+        Entry&amp;lt;String, List&amp;lt;String&amp;gt;&amp;gt; entry = groupedIter.next();
+
+        String word = entry.getKey();
+        List&amp;lt;String&amp;gt; list = entry.getValue();
+
+        // REDUCE:
+
+        reduceThreads.add(reduce(word, list, reduceCallback));
+    }
+
+    waitForAllThreadsToFinish(reduceThreads); // blocking call...
+
+    printIndex(index);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Notice that each job sent to a thread has a unique identifier. For the map phase it is the filename and for the reduce phase it is the word. It would not be hard to simulate a cluster &lt;em&gt;node failure&lt;/em&gt; by timing out a thread that is taking too long and then re-send the job to another thread. That’s what frameworks like Hadoop and MongoDB do.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Note:&lt;/strong&gt; The complete source code is available at &lt;a href=&#34;https://github.com/saoj/mapreduce&#34;&gt;https://github.com/saoj/mapreduce&lt;/a&gt;&lt;/p&gt;
+
+&lt;h3 id=&#34;conclusion&#34;&gt;Conclusion&lt;/h3&gt;
+
+&lt;p&gt;MapReduce breaks the process of indexing data in two steps: &lt;strong&gt;map&lt;/strong&gt; and &lt;strong&gt;reduce&lt;/strong&gt;. The map step needs to be completed before the reduce step, but each step can be broken down in small pieces that are executed in parallel. When you have a large data set, the ability to use a cluster and scale horizontally becomes crucial. Frameworks like Hadoop and MongoDB can manage the execution of a MapReduce operation in a cluster of computers with support for fault-tolerance. The complexity becomes hidden from the developer who only has to worry about implementing the map and reduce functions to index the data set in any way he wants to.&lt;/p&gt;
 </description>
     </item>
     
